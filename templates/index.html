@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Leaderboard & Track Selection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+        }
+
+        .left-panel {
+            flex: 1;
+            background-color: #ffffff;
+            padding: 20px;
+            border-right: 1px solid #ddd;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .right-panel {
+            flex: 2;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+        h4 {
+            text-align: center;
+        }
+
+        .track-button {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .track-button:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 90%;
+            background-color: #fff;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .track-title {
+            margin-top: 40px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .highlight {
+            background-color: #ffeb3b;
+            font-weight: bold;
+        }
+
+        .player-info {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .player-info input {
+            padding: 10px;
+            font-size: 16px;
+            width: 80%;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左側面板: 賽道選擇 -->
+        <div class="left-panel">
+            <h1>RaceCarGymPlus</h1>
+            <h4>幫我產offline data</h4>
+
+            <form action="/start_game" method="POST">
+                <label>使用者名稱: <input type="text" name="username" value="{{ highlight_user }}" required></label><br><br>
+                <label>選擇賽道:
+                    <select name="track">
+                        <option value="circle">Circle</option>
+                        <option value="austria">Austria</option>
+                    </select>
+                </label><br><br>
+                <button type="submit">開始遊戲</button>
+            </form>
+        </div>
+
+        <!-- 右側面板: 記分板 -->
+        <div class="right-panel">
+            <h1>Leaderboard</h1>
+
+            <!-- Circle Track Leaderboard -->
+            <div class="track-title">Circle Track</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player Name</th>
+                        <th>Score</th>
+                        <th>End Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in circle_leaderboard %}
+                    <tr class="{% if row['user_name'] == highlight_user %}highlight{% endif %}">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row['user_name'] }}</td>
+                        <td>{{ row['score'] }}</td>
+                        <td>{{ row['end_time'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                
+            </table>
+
+            <!-- Austria Track Leaderboard -->
+            <div class="track-title">Austria Track</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player Name</th>
+                        <th>Score</th>
+                        <th>End Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in austria_leaderboard %}
+                    <tr class="{% if row['user_name'] == highlight_user %}highlight{% endif %}">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row['user_name'] }}</td>
+                        <td>{{ row['score'] }}</td>
+                        <td>{{ row['end_time'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

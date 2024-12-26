@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>遊戲中</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        #game_container {
+            position: relative;
+            width: 400px;
+            height: 300px;
+            margin: 20px auto;
+        }
+
+        #game_view {
+            width: 100%;
+            height: 100%;
+        }
+
+        #status_container {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #loading_overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.8); /* 半透明背景 */
+            font-size: 18px;
+            color: #333;
+        }
+
+        #loading_overlay.hidden {
+            display: none; /* 隱藏高斯模糊效果 */
+        }
+    </style>
+</head>
+<body>
+    <h1>遊戲進行中 (Game ID: {{ game_id }})</h1>
+    <div id="game_container">
+        <img id="game_view" src="" alt="Game View" />
+        <div id="loading_overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 24px; text-align: center; line-height: 100vh;">
+            <span id="countdown_text">Loading...</span>
+        </div>
+    </div>
+    <div id="status">Loading...</div>
+    <div id="status_container">
+        <p>總分數 (Score): <span id="score">0</span></p>
+        <p>總步數 (Steps): <span id="steps">0</span></p>
+        <p>累積時間 (Accumulated Time): <span id="acc_time">0.0</span></p>
+        <p>遊戲狀態 (Terminal): <span id="terminal">False</span></p>
+    </div>
+    <button id="stopBtn" onclick="stopGame()">結束遊戲</button>
+    <script>
+        const gameId = "{{ game_id }}";
+        const player_id = "{{ player_id }}";
+        const wsPort = parseInt("{{ action_port }}"); // WebSocket 动作端口由 gameId 动态分配
+        const wsUrl = `ws://10.5.11.104:${wsPort}`;
+        let ws;
+
+        // 游戏控制参数
+        let throttle = 0;
+        let steer = 0;
+        let acceleration = 0.2;
+        let friction = 0.04;
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            KeyW: false,
+            KeyS: false,
+            KeyA: false,
+            KeyD: false
+        };
+        let last_score = 0
+        function setupWebSocket() {
+            console.log("?")
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("WebSocket connected");
+                document.getElementById('loading_overlay').classList.add("hidden");
+                updateImage();
+                updateGameStatus();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === "status") {
+                    document.getElementById("score").innerText = data.score;
+                    last_score  = data.score
+                    document.getElementById("steps").innerText = data.step;
+                    document.getElementById("acc_time").innerText = data.acc_time.toFixed(2);
+                    document.getElementById("terminal").innerText = data.terminal;
+                    if (data.terminal){
+                        finishGame()
+                    }
+                } else if (data.type === "image") {
+                    const imgElement = document.getElementById("game_view");
+                    imgElement.src = "data:image/png;base64," + data.data;
+                }
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket disconnected");
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        function updateGameLogic() {
+            if (keys.ArrowUp) throttle += acceleration;
+            else if (keys.ArrowDown) throttle -= acceleration;
+            else throttle -= friction * Math.sign(throttle);
+
+            if (keys.ArrowLeft) steer -= 0.05;
+            else if (keys.ArrowRight) steer += 0.05;
+            else steer *= 0.9;
+
+            throttle = Math.max(-1, Math.min(1, throttle));
+            steer = Math.max(-1, Math.min(1, steer));
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: "SET_ACTION", action: { throttle, steer } }));
+            }
+        }
+
+        function updateGameStatus() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: "GET_STATUS" }));
+                setTimeout(updateGameStatus, 500); // 每秒更新一次状态
+            }
+        }
+
+        function updateImage() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: "GET_IMG" }));
+                setTimeout(updateImage, 50); // 每 50ms 更新一次图片
+            }
+        }
+        function finishGame(){
+            fetch("/stop_game/" + gameId, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "score="+last_score+"&finished=true"
+            }).then(res => {
+                if (res.ok) {
+                    clearInterval(updateGameLogic);
+                    if (ws) ws.close();
+                    startCountdownRedirect("遊戲已完成，正在跳轉排行榜...");
+
+                }
+            });
+        }
+
+        function stopGame(){
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: "TERMINATE" })); // forced terminated
+            }
+            fetch("/stop_game/" + gameId, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "score="+last_score+"&finished=false"
+            }).then(res => {
+                if (res.ok) {
+                    clearInterval(updateGameLogic);
+                    if (ws) ws.close();
+                    startCountdownRedirect("遊戲已手動終止，正在跳轉排行榜...");
+
+                }
+            });
+
+        }
+        function startCountdownRedirect(message) {
+            const overlay = document.getElementById("loading_overlay");
+            overlay.style.display = "block"; // 显示加载覆盖层
+        
+            const countdownText = document.getElementById("countdown_text");
+            countdownText.innerText = `${message} 3 秒後跳轉...`;
+        
+            let secondsRemaining = 3;
+            const countdownInterval = setInterval(() => {
+                secondsRemaining -= 1;
+                countdownText.innerText = `${message} ${secondsRemaining} 秒後跳轉...`;
+        
+                if (secondsRemaining <= 0) {
+                    clearInterval(countdownInterval);
+                    // 获取用户 ID 并跳转
+                    window.location.href = "/?user_name=" + player_id;
+                }
+            }, 1000);
+        }
+
+        // 处理按键按下事件
+        window.addEventListener("keydown", (e) => {
+            if (e.code in keys) {
+                keys[e.code] = true;
+
+                // 映射 WASD 到方向键
+                if (e.code === "KeyW") keys["ArrowUp"] = true;
+                if (e.code === "KeyS") keys["ArrowDown"] = true;
+                if (e.code === "KeyA") keys["ArrowLeft"] = true;
+                if (e.code === "KeyD") keys["ArrowRight"] = true;
+            }
+        });
+
+        // 处理按键释放事件
+        window.addEventListener("keyup", (e) => {
+            if (e.code in keys) {
+                keys[e.code] = false;
+
+                // 映射 WASD 到方向键
+                if (e.code === "KeyW") keys["ArrowUp"] = false;
+                if (e.code === "KeyS") keys["ArrowDown"] = false;
+                if (e.code === "KeyA") keys["ArrowLeft"] = false;
+                if (e.code === "KeyD") keys["ArrowRight"] = false;
+            }
+        });
+
+        document.getElementById("stopBtn").addEventListener("click", () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+            console.log("Game stopped");
+        });
+
+        // 启动 WebSocket 和游戏
+        setupWebSocket();
+        setInterval(updateGameLogic, 50); // 每 50ms 更新游戏逻辑
+    </script>
+</body>
+</html>

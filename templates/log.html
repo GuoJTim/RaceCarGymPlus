@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Process Log</title>
+</head>
+<body>
+    <h1>Process Log</h1>
+    <table border="1" id="processTable">
+        <tr>
+            <th>Game ID</th>
+            <th>User Name</th>
+            <th>Track</th>
+            <th>Start Time</th>
+            <th>Status</th>
+        </tr>
+    </table>
+
+    <script>
+        function updateLog() {
+            fetch('/log_data')
+              .then(res => res.json())
+              .then(data => {
+                var table = document.getElementById('processTable');
+
+                // 清除除表頭以外的舊資料
+                while(table.rows.length > 1) {
+                    table.deleteRow(1);
+                }
+
+                data.forEach(row => {
+                    var tr = table.insertRow(-1);
+                    var tdGameID = tr.insertCell(0);
+                    var tdUserName = tr.insertCell(1);
+                    var tdTrack = tr.insertCell(2);
+                    var tdStart = tr.insertCell(3);
+                    var tdStatus = tr.insertCell(4);
+
+                    tdGameID.textContent = row.game_id;
+                    tdUserName.textContent = row.user_name;
+                    tdTrack.textContent = row.track;
+                    tdStart.textContent = row.start_time;
+                    tdStatus.textContent = row.status;
+                });
+              });
+        }
+
+        setInterval(updateLog, 3000); // 每3秒更新一次
+        updateLog(); // 初始載入
+    </script>
+</body>
+</html>

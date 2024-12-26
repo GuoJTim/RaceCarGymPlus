@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>記分板</title>
+</head>
+<body>
+    <h1>記分板</h1>
+    <table border="1">
+        <tr>
+            <th>使用者名稱</th>
+            <th>賽道</th>
+            <th>開始時間</th>
+            <th>結束時間</th>
+            <th>分數</th>
+            <th>是否完成跑完</th>
+        </tr>
+        {% for r in records %}
+        <tr>
+            <td>{{ r['user_name'] }}</td>
+            <td>{{ r['track'] }}</td>
+            <td>{{ r['start_time'] }}</td>
+            <td>{{ r['end_time'] if r['end_time'] else '未結束' }}</td>
+            <td>{{ r['score'] }}</td>
+            <td>{{ '是' if r['finished'] else '否' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    <a href="/">回首頁</a>
+</body>
+</html>
